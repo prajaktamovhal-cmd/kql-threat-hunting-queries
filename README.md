@@ -2,7 +2,7 @@
 
 A working set of Kusto Query Language (KQL) queries for proactive threat hunting across Microsoft Defender XDR and Microsoft Sentinel. Organized by MITRE ATT&CK tactic so it's easy to navigate whether you're hunting for a specific technique or building out detection coverage.
 
-These are generalized, sanitized versions of queries I use in production enterprise security operations — hostnames, tenant identifiers, and org-specific values have been replaced with placeholders.
+These are generalized, sanitized versions of queries I maintain for security operations. Hostnames, tenant identifiers, and org-specific values have been replaced with placeholders.
 
 ## Structure
 
