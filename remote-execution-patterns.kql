@@ -1,0 +1,34 @@
+// ============================================================
+// Lateral Movement
+// MITRE ATT&CK: T1021 (Remote Services), T1570 (Lateral Tool Transfer)
+// ============================================================
+
+// PsExec-style remote execution — a common admin tool that's
+// equally common in attacker lateral movement.
+DeviceProcessEvents
+| where Timestamp > ago(7d)
+| where FileName has_any ("psexec.exe", "psexesvc.exe")
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine, InitiatingProcessAccountName
+| order by Timestamp desc
+
+// ------------------------------------------------------------
+
+// WMI-based remote process creation — fileless lateral movement
+// technique that bypasses traditional network tool logging.
+DeviceEvents
+| where Timestamp > ago(7d)
+| where ActionType == "WmiCreateProcess"
+| project Timestamp, DeviceName, InitiatingProcessAccountName, ProcessCommandLine, RemoteIP
+| order by Timestamp desc
+
+// ------------------------------------------------------------
+
+// A single account establishing SMB/RDP connections to an
+// unusually high number of distinct hosts in a short window —
+// often indicates scanning or hop-by-hop movement.
+DeviceNetworkEvents
+| where Timestamp > ago(1d)
+| where RemotePort in (445, 3389)
+| summarize DistinctHosts = dcount(RemoteIP) by InitiatingProcessAccountName, bin(Timestamp, 1h)
+| where DistinctHosts > 10
+| order by DistinctHosts desc

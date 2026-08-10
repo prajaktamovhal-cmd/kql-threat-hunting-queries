@@ -1,0 +1,41 @@
+// ============================================================
+// Exfiltration & Shadow IT Discovery
+// MITRE ATT&CK: T1567 (Exfiltration Over Web Service),
+//               T1048 (Exfiltration Over Alternative Protocol)
+// ============================================================
+
+// Large outbound data transfers to consumer cloud storage
+// domains — a common exfiltration channel that blends in
+// with normal traffic.
+let cloudStorageDomains = dynamic([
+  "drive.google.com", "dropbox.com", "wetransfer.com",
+  "mega.nz", "1drv.ms"
+]);
+DeviceNetworkEvents
+| where Timestamp > ago(7d)
+| where RemoteUrl has_any (cloudStorageDomains)
+| summarize TotalBytesSent = sum(LocalIP == LocalIP ? 1 : 0) by DeviceName, RemoteUrl, InitiatingProcessAccountName
+| order by TotalBytesSent desc
+
+// ------------------------------------------------------------
+
+// Unsanctioned SaaS application discovery — flags sign-ins to
+// apps outside an approved allow-list, similar to shadow-IT
+// governance work done via MDCA/CASB tooling.
+let approvedApps = dynamic(["App1", "App2", "App3"]); // populate with your org's sanctioned app list
+CloudAppEvents
+| where Timestamp > ago(7d)
+| where ApplicationName !in (approvedApps)
+| summarize UserCount = dcount(AccountObjectId), EventCount = count() by ApplicationName
+| where UserCount >= 3
+| order by EventCount desc
+
+// ------------------------------------------------------------
+
+// Archive files (zip/rar/7z) created immediately before a
+// large outbound transfer — a common "stage then exfil" pattern.
+DeviceFileEvents
+| where Timestamp > ago(1d)
+| where FileName endswith ".zip" or FileName endswith ".rar" or FileName endswith ".7z"
+| project Timestamp, DeviceName, FileName, FolderPath, InitiatingProcessAccountName
+| order by Timestamp desc

@@ -1,0 +1,36 @@
+// ============================================================
+// Suspicious Process Trees
+// MITRE ATT&CK: T1059 (Command and Scripting Interpreter)
+// ============================================================
+
+// Detects Office apps spawning command-line interpreters —
+// a classic macro/payload execution pattern.
+DeviceProcessEvents
+| where Timestamp > ago(7d)
+| where InitiatingProcessFileName in~ ("winword.exe", "excel.exe", "powerpnt.exe", "outlook.exe")
+| where FileName in~ ("cmd.exe", "powershell.exe", "wscript.exe", "cscript.exe", "mshta.exe")
+| project Timestamp, DeviceName, InitiatingProcessFileName, FileName, ProcessCommandLine, AccountName
+| order by Timestamp desc
+
+// ------------------------------------------------------------
+
+// Flags LOLBins (living-off-the-land binaries) making outbound
+// network connections — common for fileless malware staging.
+let lolbins = dynamic(["certutil.exe", "regsvr32.exe", "rundll32.exe", "mshta.exe", "installutil.exe"]);
+DeviceNetworkEvents
+| where Timestamp > ago(7d)
+| where InitiatingProcessFileName in~ (lolbins)
+| where RemoteIPType == "Public"
+| project Timestamp, DeviceName, InitiatingProcessFileName, InitiatingProcessCommandLine, RemoteIP, RemoteUrl
+| order by Timestamp desc
+
+// ------------------------------------------------------------
+
+// Encoded PowerShell commands — a common obfuscation technique
+// used to bypass basic string-matching detections.
+DeviceProcessEvents
+| where Timestamp > ago(7d)
+| where FileName =~ "powershell.exe"
+| where ProcessCommandLine has_any ("-enc", "-encodedcommand", "-e ")
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine
+| order by Timestamp desc

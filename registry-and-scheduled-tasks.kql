@@ -1,0 +1,39 @@
+// ============================================================
+// Persistence via Registry Run Keys & Scheduled Tasks
+// MITRE ATT&CK: T1547 (Boot or Logon Autostart Execution),
+//               T1053 (Scheduled Task/Job)
+// ============================================================
+
+// New entries added to common autostart registry keys.
+DeviceRegistryEvents
+| where Timestamp > ago(7d)
+| where ActionType == "RegistryValueSet"
+| where RegistryKey has_any (
+    @"\Software\Microsoft\Windows\CurrentVersion\Run",
+    @"\Software\Microsoft\Windows\CurrentVersion\RunOnce"
+  )
+| project Timestamp, DeviceName, RegistryKey, RegistryValueName, RegistryValueData, InitiatingProcessFileName
+| order by Timestamp desc
+
+// ------------------------------------------------------------
+
+// Scheduled tasks created outside of business hours — often a
+// sign of persistence set up during off-shift access.
+DeviceProcessEvents
+| where Timestamp > ago(7d)
+| where FileName =~ "schtasks.exe"
+| where ProcessCommandLine has "/create"
+| where datetime_part("hour", Timestamp) !between (7 .. 19)
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine
+| order by Timestamp desc
+
+// ------------------------------------------------------------
+
+// New Windows services created via sc.exe or PowerShell —
+// common technique to survive reboots with elevated privileges.
+DeviceProcessEvents
+| where Timestamp > ago(7d)
+| where (FileName =~ "sc.exe" and ProcessCommandLine has "create")
+    or (FileName =~ "powershell.exe" and ProcessCommandLine has "New-Service")
+| project Timestamp, DeviceName, AccountName, ProcessCommandLine
+| order by Timestamp desc
